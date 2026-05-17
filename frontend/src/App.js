@@ -1,42 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { io } from 'socket.io-client';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from './components/Header';
 import SignalForm from './components/SignalForm';
 import SignalList from './components/SignalList';
 
-const SOCKET_URL = process.env.REACT_APP_API_URL || '';
+const API_URL = process.env.REACT_APP_API_URL || '';
+const POLL_INTERVAL = 3000; // poll every 3 seconds
 
 export default function App() {
   const [signals, setSignals] = useState([]);
   const [connected, setConnected] = useState(false);
+  const lastCountRef = useRef(0);
+
+  const fetchSignals = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/signals`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setSignals(data);
+      lastCountRef.current = data.length;
+      setConnected(true);
+    } catch {
+      setConnected(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Fetch existing signals on mount
-    fetch(`${SOCKET_URL}/api/signals`)
-      .then((res) => res.json())
-      .then((data) => setSignals(data))
-      .catch((err) => console.error('Failed to fetch signals:', err));
+    // Initial fetch
+    fetchSignals();
 
-    // Connect to Socket.IO for live updates
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    // Poll for new signals
+    const interval = setInterval(fetchSignals, POLL_INTERVAL);
 
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
-
-    socket.on('new_signal', (signal) => {
-      setSignals((prev) => [signal, ...prev]);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+    return () => clearInterval(interval);
+  }, [fetchSignals]);
 
   return (
     <div className="app">
       <Header connected={connected} />
       <main className="main-content">
-        <SignalForm />
+        <SignalForm onSignalSent={fetchSignals} />
         <SignalList signals={signals} />
       </main>
     </div>

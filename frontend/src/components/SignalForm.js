@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 
-export default function SignalForm() {
+export default function SignalForm({ onSignalSent }) {
   const [symbol, setSymbol] = useState('');
   const [direction, setDirection] = useState('BUY');
   const [price, setPrice] = useState('');
@@ -25,6 +25,7 @@ export default function SignalForm() {
       });
       setSymbol('');
       setPrice('');
+      if (onSignalSent) onSignalSent();
     } catch (err) {
       console.error('Failed to send signal:', err);
     } finally {
